@@ -22,9 +22,14 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--input", type=str, required=True)
+parser.add_argument("--output", type=str, required=True)
+args = parser.parse_args()
 
 # Import dataset
-dataset = pd.read_csv('DeepViscosity_input.csv') # replace with your csv file, see format in DeepViscosity_input.csv file
+dataset = pd.read_csv(args.input) # replace with your csv file, see format in DeepViscosity_input.csv file
 
 name = dataset['Name'].to_list()
 Heavy_seq = dataset['Heavy_Chain'].to_list()
@@ -32,7 +37,8 @@ Light_seq = dataset['Light_Chain'].to_list()
 
 
 # convert to fasta file
-file_out='seq_H.fasta'
+os.makedirs(args.output, exist_ok=True)
+file_out=os.path.join(args.output, 'seq_H.fasta')
 
 with open(file_out, "w") as output_handle:
   for i in range(len(name)):
@@ -46,7 +52,7 @@ with open(file_out, "w") as output_handle:
     )
     SeqIO.write(record, output_handle, "fasta")
 
-file_out='seq_L.fasta'
+file_out=os.path.join(args.output, 'seq_L.fasta')
 
 with open(file_out, "w") as output_handle:
   for i in range(len(name)):
@@ -61,17 +67,17 @@ with open(file_out, "w") as output_handle:
     SeqIO.write(record, output_handle, "fasta")
 
 # sequence alignment with ANARCI
-os.system('ANARCI -i seq_H.fasta -o seq_aligned -s imgt -r heavy --csv')
-os.system('ANARCI -i seq_L.fasta -o seq_aligned -s imgt -r light --csv')
+os.system(f'ANARCI -i {os.path.join(args.output, "seq_H.fasta")} -o {os.path.join(args.output, "seq_aligned")} -s imgt -r heavy --csv')
+os.system(f'ANARCI -i {os.path.join(args.output, "seq_L.fasta")} -o {os.path.join(args.output, "seq_aligned")} -s imgt -r light --csv')
 
-H_aligned = pd.read_csv('seq_aligned_H.csv')
-L_aligned = pd.read_csv('seq_aligned_KL.csv')
+H_aligned = pd.read_csv(os.path.join(args.output, 'seq_aligned_H.csv'))
+L_aligned = pd.read_csv(os.path.join(args.output, 'seq_aligned_KL.csv'))
 
 # sequence alignment - source: # https://github.com/Lailabcode/DeepSCM/blob/main/deepscm-master/seq_preprocessing.py
 def seq_preprocessing():
-  infile_H = pd.read_csv('seq_aligned_H.csv')
-  infile_L = pd.read_csv('seq_aligned_KL.csv')
-  outfile = open('seq_aligned_HL.txt', "w")
+  infile_H = pd.read_csv(os.path.join(args.output, 'seq_aligned_H.csv'))
+  infile_L = pd.read_csv(os.path.join(args.output, 'seq_aligned_KL.csv'))
+  outfile = open(os.path.join(args.output, 'seq_aligned_HL.txt'), "w")
 
   H_inclusion_list = ['1','2','3','4','5','6','7','8','9','10',                     '11','12','13','14','15','16','17','18','19','20',                     '21','22','23','24','25','26','27','28','29','30',                     '31','32','33','34','35','36','37','38','39','40',                     '41','42','43','44','45','46','47','48','49','50',                     '51','52','53','54','55','56','57','58','59','60',                     '61','62','63','64','65','66','67','68','69','70',                     '71','72','73','74','75','76','77','78','79','80',                     '81','82','83','84','85','86','87','88','89','90',                     '91','92','93','94','95','96','97','98','99','100',                     '101','102','103','104','105','106','107','108','109','110',                     '111','111A','111B','111C','111D','111E','111F','111G','111H',                     '112I','112H','112G','112F','112E','112D','112C','112B','112A','112',                    '113','114','115','116','117','118','119','120',                     '121','122','123','124','125','126','127','128']
 
@@ -116,7 +122,7 @@ def load_input_data(filename):
             seq_list.append(line[1])
     return name_list, seq_list
 
-name_list, seq_list = load_input_data('seq_aligned_HL.txt')
+name_list, seq_list = load_input_data(os.path.join(args.output, 'seq_aligned_HL.txt'))
 X = seq_list
 
 # One hot encoding of aligned sequences
@@ -169,7 +175,7 @@ features = ['Name', 'SAP_pos_CDRH1','SAP_pos_CDRH2','SAP_pos_CDRH3','SAP_pos_CDR
           'SCM_neg_CDRH1','SCM_neg_CDRH2','SCM_neg_CDRH3','SCM_neg_CDRL1','SCM_neg_CDRL2','SCM_neg_CDRL3','SCM_neg_CDR','SCM_neg_Hv','SCM_neg_Lv','SCM_neg_Fv',
           'SCM_pos_CDRH1','SCM_pos_CDRH2','SCM_pos_CDRH3','SCM_pos_CDRL1','SCM_pos_CDRL2','SCM_pos_CDRL3','SCM_pos_CDR','SCM_pos_Hv','SCM_pos_Lv','SCM_pos_Fv']
 df_deepsp = pd.concat([pd.DataFrame(name_list), pd.DataFrame(sap_pos), pd.DataFrame(scm_neg), pd.DataFrame(scm_pos)], ignore_index=True, axis=1,); df_deepsp.columns = features
-df_deepsp.to_csv('DeepSP_descriptors.csv', index=False)
+df_deepsp.to_csv(os.path.join(args.output, 'DeepSP_descriptors.csv'), index=False)
 
 
 # DeepViscosity Predictions [ Low viscoity(<=20cps) : 0, High viscosity(>20cps) : 1 ]
@@ -210,4 +216,4 @@ df_deepvis = pd.DataFrame({
     
 })
 
-df_deepvis.to_csv('DeepViscosity_classes.csv', index=False)
+df_deepvis.to_csv(os.path.join(args.output, 'DeepViscosity_classes.csv'), index=False)
